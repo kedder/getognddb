@@ -6,7 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 )
+
+const ddbURL string = "http://ddb.glidernet.org/download/?j=1"
 
 // OGNDevice represents record in OGN device database
 type OGNDevice struct {
@@ -24,22 +27,21 @@ type ognDatabase struct {
 }
 
 type converterArgs struct {
-	InputFile  string
 	OutputFile string
 }
 
 func parseArgs() converterArgs {
 	flag.Parse()
 	args := flag.Args()
-	return converterArgs{InputFile: args[0], OutputFile: args[1]}
+	return converterArgs{OutputFile: args[0]}
 }
 
-func parseDatabase(inputFile string) []OGNDevice {
+func parseDatabase(jsonData []byte) []OGNDevice {
 	var err error
-	jsonData, err := ioutil.ReadFile(inputFile)
-	if err != nil {
-		panic(err)
-	}
+	// jsonData, err := ioutil.ReadFile(inputFile)
+	// if err != nil {
+	// 	panic(err)
+	// }
 	var db ognDatabase
 	err = json.Unmarshal(jsonData, &db)
 	if err != nil {
@@ -77,17 +79,37 @@ func generateLXNAV(devices []OGNDevice) bytes.Buffer {
 	return buf
 }
 
+func fetchDDB() ([]byte, error) {
+	resp, err := http.Get(ddbURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	// buf := new(strings.Builder)
+	// buf.ReadFrom(resp)
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
 func main() {
 	args := parseArgs()
 	flag.Parse()
-	fmt.Println("Input:", args.InputFile)
-	fmt.Println("Output:", args.OutputFile)
 
-	db := parseDatabase(args.InputFile)
+	fmt.Println("Fetching data...")
+	json, err := fetchDDB()
+	if err != nil {
+		panic(err)
+	}
 
+	fmt.Println("Generating LXNAV database")
+	db := parseDatabase(json)
 	buf := generateLXNAV(db)
 
-	err := ioutil.WriteFile(args.OutputFile, buf.Bytes(), 0644)
+	fmt.Println("Writing output:", args.OutputFile)
+	err = ioutil.WriteFile(args.OutputFile, buf.Bytes(), 0644)
 	if err != nil {
 		panic(err)
 	}

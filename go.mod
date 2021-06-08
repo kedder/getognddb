@@ -1,3 +1,3 @@
-module github.com/kedder/ogndbconvert
+module github.com/kedder/getognddb
 
-go 1.13
+go 1.16
